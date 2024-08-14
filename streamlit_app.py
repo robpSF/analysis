@@ -14,6 +14,9 @@ if uploaded_file:
     # Drop rows where 'created' is NaT after conversion
     df = df.dropna(subset=['created'])
 
+    # Ensure only one entry per opportunity_id per day
+    df = df.drop_duplicates(subset=['opportunity_id', 'created'], keep='last')
+
     # Check if the 'created' column contains valid dates after dropping NaT
     if not df.empty and df['created'].notna().any():
         # Add a date range picker with valid date range
