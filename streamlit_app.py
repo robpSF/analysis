@@ -11,8 +11,10 @@ if uploaded_file:
     # Process data
     df['created'] = pd.to_datetime(df['created'])
     df['updated'] = pd.to_datetime(df['updated'])
-    df['week_created'] = df['created'].dt.to_period('W').apply(lambda r: r.start_time)
-    df['week_updated'] = df['updated'].dt.to_period('W').apply(lambda r: r.start_time)
+    
+    # Calculate the start of the week for 'created' and 'updated' columns
+    df['week_created'] = df['created'] - pd.to_timedelta(df['created'].dt.weekday, unit='D')
+    df['week_updated'] = df['updated'] - pd.to_timedelta(df['updated'].dt.weekday, unit='D')
 
     # Milestone Movement Overview
     milestone_pivot = df.pivot_table(index='milestone', columns='week_created', aggfunc='count', values='opportunity_id', fill_value=0)
@@ -62,4 +64,3 @@ if uploaded_file:
 
 else:
     st.write("Please upload an Excel file to proceed.")
-
