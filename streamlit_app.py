@@ -55,6 +55,19 @@ if uploaded_file:
     st.subheader("Milestone Transition Bar Chart")
     st.bar_chart(df_transition)
 
+    # Detailed Progression for Each Opportunity
+    st.header("Detailed Opportunity Progression")
+
+    # Filter opportunities that started with "First Call"
+    df_first_call = df_sorted[df_sorted['milestone'] == "First Call"]
+
+    for opportunity_id in df_first_call['opportunity_id'].unique():
+        df_opportunity = df_sorted[df_sorted['opportunity_id'] == opportunity_id]
+        st.subheader(f"Opportunity ID: {opportunity_id}")
+        st.write(f"Name: {df_opportunity['name'].iloc[0]}")
+        st.write("Progression:")
+        st.write(df_opportunity[['milestone', 'created', 'updated']])
+
     # Stagnation Identification
     st.header("Stagnation Identification")
     stagnation_weeks = (df['updated'] - df['created']).dt.days / 7
