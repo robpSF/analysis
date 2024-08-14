@@ -14,9 +14,6 @@ if uploaded_file:
     # Drop rows where 'created' is NaT after conversion
     df = df.dropna(subset=['created'])
 
-    # Ensure only one entry per opportunity_id per day
-    df = df.drop_duplicates(subset=['opportunity_id', 'created'], keep='last')
-
     # Check if the 'created' column contains valid dates after dropping NaT
     if not df.empty and df['created'].notna().any():
         # Add a date range picker with valid date range
@@ -37,8 +34,8 @@ if uploaded_file:
         st.header("Prospect Progression Tracking")
 
         # Track each opportunity's progression from one milestone to the next
-        df_sorted = df.sort_values(by=['opportunity_id', 'created'])
-        df_progression = df_sorted.groupby('opportunity_id').agg({
+        df_sorted = df.sort_values(by=['opportunity_id', 'created', 'updated'])
+        df_progression = df_sorted.groupby(['opportunity_id', 'created']).agg({
             'previous_milestone': 'first',
             'milestone': 'last'
         }).reset_index()
@@ -52,10 +49,8 @@ if uploaded_file:
         # Detailed Progression for Each Opportunity
         st.header("Detailed Opportunity Progression")
 
-        # Filter opportunities that started with "First Call"
-        df_first_call = df_sorted[df_sorted['milestone'] == "First Call"]
-
-        for opportunity_id in df_first_call['opportunity_id'].unique():
+        # Show all milestones for each opportunity on the same day
+        for opportunity_id in df_sorted['opportunity_id'].unique():
             df_opportunity = df_sorted[df_sorted['opportunity_id'] == opportunity_id]
             st.subheader(f"Opportunity ID: {opportunity_id}")
             st.write(f"Name: {df_opportunity['name'].iloc[0]}")
