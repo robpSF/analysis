@@ -11,10 +11,8 @@ if uploaded_file:
     df['created'] = pd.to_datetime(df['created'], errors='coerce').dt.date
     df['updated'] = pd.to_datetime(df['updated'], errors='coerce').dt.date
 
-    # Handle cases where 'created' might have NaT values due to conversion issues
-    if df['created'].isnull().all():
-        st.error("All 'created' dates could not be parsed. Please check your data.")
-    else:
+    # Check if the 'created' column contains valid dates
+    if df['created'].notna().any():
         # Add a date range picker with valid date range
         st.sidebar.header("Filter by Date Range")
         start_date, end_date = st.sidebar.date_input(
@@ -83,5 +81,7 @@ if uploaded_file:
         if st.button("Refresh Data"):
             st.experimental_rerun()
 
+    else:
+        st.error("No valid 'created' dates found. Please check your data.")
 else:
     st.write("Please upload an Excel file to proceed.")
