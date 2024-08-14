@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-import matplotlib.pyplot as plt
 
 # Load the data
 uploaded_file = st.file_uploader("Upload your Excel file", type=["xlsx"])
@@ -9,32 +8,22 @@ if uploaded_file:
     df = pd.read_excel(uploaded_file)
 
     # Convert 'created' and 'updated' columns to datetime
-    df['created'] = pd.to_datetime(df['created'])
-    df['updated'] = pd.to_datetime(df['updated'])
+    df['created'] = pd.to_datetime(df['created']).dt.date
+    df['updated'] = pd.to_datetime(df['updated']).dt.date
 
     # Add a date range picker
     st.sidebar.header("Filter by Date Range")
     start_date, end_date = st.sidebar.date_input(
         "Select date range",
-        [df['created'].min().date(), df['created'].max().date()]
+        [df['created'].min(), df['created'].max()]
     )
 
     # Filter data based on the selected date range
-    df = df[(df['created'].dt.date >= start_date) & (df['created'].dt.date <= end_date)]
+    df = df[(df['created'] >= start_date) & (df['created'] <= end_date)]
 
-    # Calculate the start of the week for 'created' and 'updated' columns
-    df['week_created'] = df['created'] - pd.to_timedelta(df['created'].dt.weekday, unit='D')
-    df['week_updated'] = df['updated'] - pd.to_timedelta(df['updated'].dt.weekday, unit='D')
-
-    # Milestone Movement Overview
-    milestone_pivot = df.pivot_table(index='milestone', columns='week_created', aggfunc='count', values='opportunity_id', fill_value=0)
-    
-    st.header("Milestone Movement Overview")
-    st.write("This table shows the number of prospects at each milestone per week.")
-    st.dataframe(milestone_pivot)
-
-    st.subheader("Milestone Trend Over Time")
-    st.line_chart(milestone_pivot.T)
+    # Calculate the start of the week for 'created' and 'updated' columns (date only)
+    df['week_created'] = df['created'] - pd.to_timedelta(pd.to_datetime(df['created']).dt.weekday, unit='D').dt.date
+    df['week_updated'] = df['updated'] - pd.to_timedelta(pd.to_datetime(df['updated']).dt.weekday, unit='D').dt.date
 
     # Prospect Progression Tracking
     st.header("Prospect Progression Tracking")
@@ -52,9 +41,6 @@ if uploaded_file:
     st.write("This table shows the number of unique prospects transitioning between milestones.")
     st.dataframe(df_transition)
 
-    st.subheader("Milestone Transition Bar Chart")
-    st.bar_chart(df_transition)
-
     # Detailed Progression for Each Opportunity
     st.header("Detailed Opportunity Progression")
 
@@ -70,7 +56,7 @@ if uploaded_file:
 
     # Stagnation Identification
     st.header("Stagnation Identification")
-    stagnation_weeks = (df['updated'] - df['created']).dt.days / 7
+    stagnation_weeks = (pd.to_datetime(df['updated']) - pd.to_datetime(df['created'])).dt.days / 7
     df_stagnant = df[(stagnation_weeks > 4) & (df['milestone'] == df['previous_milestone'])]
 
     st.write(f"There are {df_stagnant.shape[0]} stagnant prospects.")
