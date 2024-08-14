@@ -2,17 +2,29 @@ import streamlit as st
 import pandas as pd
 
 # Load the data
-uploaded_file = st.file_uploader("Upload your Excel file", type=["xlsx"])
+uploaded_file = st.file_uploader("Upload your Excel file", type=["csv", "xlsx"])
 
 if uploaded_file:
-    df = pd.read_excel(uploaded_file)
+    if uploaded_file.name.endswith('.csv'):
+        df = pd.read_csv(uploaded_file)
+    else:
+        df = pd.read_excel(uploaded_file)
 
-    # Convert 'created' and 'updated' columns to datetime and then to date only
-    df['created'] = pd.to_datetime(df['created'], errors='coerce').dt.date
-    df['updated'] = pd.to_datetime(df['updated'], errors='coerce').dt.date
+    # Convert 'created' and 'updated' columns to datetime
+    df['created'] = pd.to_datetime(df['created'], errors='coerce')
+    df['updated'] = pd.to_datetime(df['updated'], errors='coerce')
 
     # Drop rows where 'created' is NaT after conversion
     df = df.dropna(subset=['created'])
+
+    # Ensure correct sorting
+    df = df.sort_values(by=['opportunity_id', 'created'])
+
+    # Calculate days spent at each milestone
+    df['days_at_milestone'] = df.groupby('opportunity_id')['created'].diff().shift(-1).dt.days
+
+    # Handle the last milestone for each opportunity
+    df['days_at_milestone'].fillna((pd.Timestamp.now() - df['created']).dt.days, inplace=True)
 
     # Check if the 'created' column contains valid dates after dropping NaT
     if not df.empty and df['created'].notna().any():
@@ -20,69 +32,25 @@ if uploaded_file:
         st.sidebar.header("Filter by Date Range")
         start_date, end_date = st.sidebar.date_input(
             "Select date range",
-            [df['created'].min(), df['created'].max()]
+            [df['created'].min().date(), df['created'].max().date()]
         )
 
         # Filter data based on the selected date range
-        df = df[(df['created'] >= start_date) & (df['created'] <= end_date)]
+        df = df[(df['created'].dt.date >= start_date) & (df['created'].dt.date <= end_date)]
 
-        # Calculate the start of the week for 'created' and 'updated' columns (using only dates)
-        df['week_created'] = pd.to_datetime(df['created']) - pd.to_timedelta(pd.to_datetime(df['created']).dt.weekday, unit='D')
-        df['week_updated'] = pd.to_datetime(df['updated']) - pd.to_timedelta(pd.to_datetime(df['updated']).dt.weekday, unit='D')
+        # Prospect Progression Tracking with Days at Each Milestone
+        st.header("Prospect Progression Tracking with Days at Each Milestone")
 
-        # Prospect Progression Tracking
-        st.header("Prospect Progression Tracking")
+        # Display the updated DataFrame with days spent at each milestone
+        st.write(df[['opportunity_id', 'name', 'milestone', 'created', 'updated', 'days_at_milestone']])
 
-        # Track each opportunity's progression from one milestone to the next
-        df_sorted = df.sort_values(by=['opportunity_id', 'created', 'updated'])
-        df_progression = df_sorted.groupby(['opportunity_id', 'created']).agg({
-            'previous_milestone': 'first',
-            'milestone': 'last'
-        }).reset_index()
-
-        # Count the transitions
-        df_transition = df_progression.groupby(['previous_milestone', 'milestone']).size().unstack(fill_value=0)
-
-        st.write("This table shows the number of unique prospects transitioning between milestones.")
-        st.dataframe(df_transition)
-
-        # Detailed Progression for Each Opportunity
-        st.header("Detailed Opportunity Progression")
-
-        # Show all milestones for each opportunity on the same day
-        for opportunity_id in df_sorted['opportunity_id'].unique():
-            df_opportunity = df_sorted[df_sorted['opportunity_id'] == opportunity_id]
-            st.subheader(f"Opportunity ID: {opportunity_id}")
-            st.write(f"Name: {df_opportunity['name'].iloc[0]}")
-            st.write("Progression:")
-            st.write(df_opportunity[['milestone', 'created', 'updated']])
-
-        # Stagnation Identification
-        st.header("Stagnation Identification")
-        stagnation_weeks = (pd.to_datetime(df['updated']) - pd.to_datetime(df['created'])).dt.days / 7
-        df_stagnant = df[(stagnation_weeks > 4) & (df['milestone'] == df['previous_milestone'])]
-
-        st.write(f"There are {df_stagnant.shape[0]} stagnant prospects.")
-        st.write("These are the prospects that have not moved for over 4 weeks:")
-        st.dataframe(df_stagnant)
-
-        # Lost Reason Analysis
-        st.header("Lost Reason Analysis")
-        lost_reasons = df['lost reason'].value_counts()
-
-        st.subheader("Lost Reasons Distribution")
-        st.bar_chart(lost_reasons)
-
-        # Weekly Summary Dashboard
-        st.header("Weekly Summary Dashboard")
-        summary_pivot = df.pivot_table(index='milestone', columns=df['week_created'].dt.date, aggfunc='count', values='opportunity_id', fill_value=0)
-        st.write("Total prospects per milestone:")
-        st.dataframe(summary_pivot)
-
-        if st.button("Refresh Data"):
-            st.experimental_rerun()
+        # Summary of time spent at each milestone
+        st.subheader("Summary of Time Spent at Each Milestone")
+        summary = df.groupby('milestone')['days_at_milestone'].mean().reset_index()
+        summary.columns = ['Milestone', 'Average Days Spent']
+        st.dataframe(summary)
 
     else:
         st.error("No valid 'created' dates found after cleaning. Please check your data.")
 else:
-    st.write("Please upload an Excel file to proceed.")
+    st.write("Please upload an Excel or CSV file to proceed.")
