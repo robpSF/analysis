@@ -38,14 +38,22 @@ if uploaded_file:
 
     # Prospect Progression Tracking
     st.header("Prospect Progression Tracking")
-    df['progress'] = df['milestone'] != df['previous_milestone']
-    df_progress = df[df['progress']].groupby(['previous_milestone', 'milestone']).size().unstack(fill_value=0)
-    
-    st.write("This table shows the number of prospects transitioning between milestones.")
-    st.dataframe(df_progress)
+
+    # Track each opportunity's progression from one milestone to the next
+    df_sorted = df.sort_values(by=['opportunity_id', 'created'])
+    df_progression = df_sorted.groupby('opportunity_id').agg({
+        'previous_milestone': 'first',
+        'milestone': 'last'
+    }).reset_index()
+
+    # Count the transitions
+    df_transition = df_progression.groupby(['previous_milestone', 'milestone']).size().unstack(fill_value=0)
+
+    st.write("This table shows the number of unique prospects transitioning between milestones.")
+    st.dataframe(df_transition)
 
     st.subheader("Milestone Transition Bar Chart")
-    st.bar_chart(df_progress)
+    st.bar_chart(df_transition)
 
     # Stagnation Identification
     st.header("Stagnation Identification")
